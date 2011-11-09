@@ -1,0 +1,5 @@
+C:\SergeProjects\TestProjects\HeartbeatHandler\HeartbeatHandler\bin\HeartbeatHandler.dll
+C:\SergeProjects\TestProjects\HeartbeatHandler\HeartbeatHandler\bin\HeartbeatHandler.pdb
+C:\SergeProjects\TestProjects\HeartbeatHandler\HeartbeatHandler\obj\Debug\ResolveAssemblyReference.cache
+C:\SergeProjects\TestProjects\HeartbeatHandler\HeartbeatHandler\obj\Debug\HeartbeatHandler.dll
+C:\SergeProjects\TestProjects\HeartbeatHandler\HeartbeatHandler\obj\Debug\HeartbeatHandler.pdb
