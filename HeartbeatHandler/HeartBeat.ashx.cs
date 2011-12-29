@@ -7,6 +7,9 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Runtime.Serialization.Json;
 using System.IO;
+using System.Configuration;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 
 namespace HeartbeatHandler
 {
@@ -15,72 +18,24 @@ namespace HeartbeatHandler
     /// </summary>
     public class HeartBeat : IHttpHandler
     {
+        private static readonly string STATUS_OK = "ok";
+        private static readonly string STATUS_FAIL = "fail";
+        private static string overallStatus = STATUS_OK;
+
         public void ProcessRequest(HttpContext context)
         {
+            context.Response.Clear();
             context.Response.ContentType = "application/json";
             context.Response.ContentEncoding = Encoding.UTF8;
 
-            string strServer = "Data Source=(local);Initial Catalog=";
-            string strSecurity = ";Integrated Security=SSPI";
+            JProperty dataBase = new JProperty("databaseStatuses", TestDatabaseStatuses());
+            JProperty linkService =   new JProperty("linkStatuses", TestLinkStatuses());
+            JProperty wsService = new JProperty("wsStatuses", TestWsStatuses());
+            JProperty overAllStatus = new JProperty("overallStatus", overallStatus);
 
-            string[] Services = { "mip_dw", "mip_portal", "mip_user" };
+            JObject jsonResponse = new JObject(overAllStatus, dataBase, linkService, wsService);
 
-            string statusOk = "OK";
-            string statusNotOk = "Not OK";
-            string strResponse = string.Empty;
-
-            List<ConnectionStatus> results = new List<ConnectionStatus>();
-            OverAllStatus overallStatus = new OverAllStatus();
-            overallStatus.overallStatus = "success";
-
-            foreach (string service in Services)
-            {
-                SqlConnection connection = new SqlConnection(strServer + service + strSecurity);
-
-                try
-                {
-                    connection.Open();
-                }
-                catch (Exception)
-                {
-                }
-
-                if ((connection.State & ConnectionState.Open) > 0)
-                {
-                    overallStatus.databases.Add(new ConnectionStatus(service, statusOk));
-                    connection.Close();
-                }
-                else
-                {
-                    overallStatus.databases.Add(new ConnectionStatus(service, statusNotOk));
-                    overallStatus.overallStatus = "fail";
-                }
-            }
-
-            // check Mip Services
-            //
-            overallStatus.mipServices.Add(new ConnectionStatus("mip1", statusOk));
-            overallStatus.mipServices.Add(new ConnectionStatus("mip2", statusOk));
-
-            // check Link Services
-            //
-            overallStatus.linkServices.Add(new ConnectionStatus("link1", statusOk));
-            overallStatus.linkServices.Add(new ConnectionStatus("link2", statusOk));
-
-            // Serialize the results as JSON
-            DataContractJsonSerializer serializer = new DataContractJsonSerializer(overallStatus.GetType());
-            MemoryStream memoryStream = new MemoryStream();
-            try
-            {
-                serializer.WriteObject(memoryStream, overallStatus);
-                strResponse = Encoding.Default.GetString(memoryStream.ToArray());
-            }
-            catch (Exception ex) 
-            {
-                strResponse = "Processing Error: " + ex.Message;
-            }
-
-            context.Response.Write(strResponse);
+            context.Response.Write(JsonConvert.SerializeObject(jsonResponse));
         }
 
         public bool IsReusable
@@ -89,6 +44,80 @@ namespace HeartbeatHandler
             {
                 return false;
             }
+        }
+
+        private static JArray TestDatabaseStatuses()
+        {
+            JArray databaseStatuses = new JArray();
+            foreach (ConnectionStringSettings conSetting in ConfigurationManager.ConnectionStrings)
+            {
+                SqlConnection connection = new SqlConnection(conSetting.ToString());
+
+                try
+                {
+                    connection.Open();
+                }
+                catch (Exception){
+                }
+
+                if ((connection.State & ConnectionState.Open) > 0)
+                {
+                    databaseStatuses.Add(constructStatusJson(true, conSetting.Name, 0.0d));
+                    connection.Close();
+                }
+                else
+                {
+                    databaseStatuses.Add(constructStatusJson(false, conSetting.Name, 0.0d));
+                    overallStatus = STATUS_FAIL;
+                }
+            }
+
+            return databaseStatuses;
+        }
+
+        /// <summary>
+        /// The link.sln needs to be running for these tests to pass
+        /// </summary>
+        private static JArray TestLinkStatuses()
+        {
+            JArray linkStatuses = new JArray();
+            overallStatus = STATUS_FAIL;
+            return linkStatuses;
+        }
+
+        /// <summary>
+        /// The mipws.sln needs to be running for these tests to pass
+        /// </summary>
+        private static JArray TestWsStatuses()
+        {
+            JArray wsStatuses = new JArray();
+
+
+            // find the demo campaign which tests mip_portal connectivity
+            //VORoiCampaign demoCampaigns = new RoiCampaignCoreService().FindRoiCampaignById(1);
+
+            //wsStatuses.Add(constructStatusJson(true, "mip_portal", 0.0d));
+
+            // find a provider (andrew stiles) from mip_dw 
+            //new ProviderProfileCoreService().FindFullProviderProfileByIdCampaign(1257455, 1);
+
+            //wsStatuses.Add(constructStatusJson(true, "mip_dw", 0.0d));
+            AddClass a = new AddClass();
+            return wsStatuses;
+        }
+
+
+        private static JValue SetSatus()
+        {
+            JValue status = new JValue("true");
+            return status;
+
+        }
+        private static JObject constructStatusJson(bool ok, string name, double timeInMilliseconds)
+        {
+            return new JObject(new JProperty("status", ok ? STATUS_OK : STATUS_FAIL),
+                               new JProperty("name", name),
+                               new JProperty("time", timeInMilliseconds));
         }
     }
 }
